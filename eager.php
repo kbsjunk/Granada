@@ -58,17 +58,20 @@ class Eager
 	 * @return void 
 	 */
 	private static function eagerly($model, &$parents, $include, $relationship_args = array(), $relationship_with = false)
-	{       
+	{    
+	 // var_dump($relationship_with);
 	    if($relationship = call_user_func_array(array($model,$include),$relationship_args)){
            
     		$relationship->reset_relation();
-            if($relationship_with) $relationship->with($relationship_with);
+    		if($relationship_with) {
+    			$relationship->with_array($relationship_with);
+    		}
      
     		// Initialize the relationship attribute on the parents. As expected, "many" relationships
     		// are initialized to an array and "one" relationships are initialized to null.
     		foreach ($parents as &$parent)
     		{
-    			$parent->ignore[$include] = (in_array($model->relating, array('has_many', 'has_and_belongs_to_many'))) ? array() : null;
+    			$parent->ignore[$include] = (in_array($model->relating, array('has_many', 'has_many_through'))) ? array() : null;
     		}
     
     		if (in_array($relating = $model->relating, array('has_one', 'has_many', 'belongs_to')))
@@ -77,7 +80,7 @@ class Eager
     		}
     		else
     		{
-    			static::has_and_belongs_to_many($relationship, $parents, $model->relating_key, $model->relating_table, $include);
+    			static::has_many_through($relationship, $parents, $model->relating_key, $model->relating_table, $include);
     		}
         }
 	}
@@ -99,6 +102,7 @@ class Eager
 	 */
 	private static function has_one($relationship, &$parents, $relating_key, $include)
 	{
+
 	    $related = $relationship->where_in($relating_key, array_keys($parents))->group_by($relating_key)->find_many();
         foreach ($related as $key => $child)
 		{  
@@ -119,11 +123,11 @@ class Eager
 	 */
 	private static function has_many($relationship, &$parents, $relating_key, $include)
 	{
-           
+
 	    $related = $relationship->where_in($relating_key, array_keys($parents))->find_many();
 		foreach ($related as $key => $child)
 		{   
-			$parents[$child->$relating_key]->ignore[$include][$child->id()] = $child;
+			$parents[$child->$relating_key]->ignore[$include][$key] = $child;
 		}
 	} 
 
@@ -177,16 +181,19 @@ class Eager
 	 *
 	 * @return void	
 	 */
-	private static function has_and_belongs_to_many($relationship, &$parents, $relating_key, $relating_table, $include)
+	private static function has_many_through($relationship, &$parents, $relating_key, $relating_table, $include)
 	{
-		$children = $relationship->select($relating_table.".".$relating_key[0])->where_in($relating_table.'.'.$relating_key[0], array_keys($parents))->find_many();
 
-		// The foreign key is added to the select to allow us to easily match the models back to their parents.
-		// Otherwise, there would be no apparent connection between the models to allow us to match them.
+		$children = $relationship->select($relating_table.".".$relating_key[0])
+			->select_expr('CONCAT('.$relating_table.".".$relating_key[0].',"::",'.$relating_table.".".$relating_key[1].') AS '.$relating_key[1])
+			->select_expr($relating_table.".".$relating_key[1].' AS real_'.$relating_key[1])
+			->where_in($relating_table.'.'.$relating_key[0], array_keys($parents))->find_many();
 
-		foreach ($children as $child)
+		foreach ($children as $key => $child)
 		{ 
-			$parents[$child->$relating_key[0]]->ignore[$include][$child->id()] = $child;
+			$real_key = 'real_'.$relating_key[1];
+			$child->$relating_key[1] = $child->$real_key;
+			$parents[$child->$relating_key[0]]->ignore[$include][$child->$real_key] = $child;
 		}
 	}    
 }
