@@ -362,8 +362,27 @@ class Model extends ORMWrapper
     public function with()
     {
         $this->includes = func_get_args();
-
         return $this;
+    }
+    public function with_array($args)
+    {
+        $args = explode(',', $args);
+        foreach ($args as $arg) {
+            $nested = explode('.', $arg, 2);
+            if (isset($nested[1])) {
+                $arg = array($nested[0] => array('with' => $nested[1]));
+            }
+            $this->includes[] = $arg;
+        }
+        return $this;
+    }
+
+    protected static function _get_static_property($class_name, $property, $default=null) {
+        if (!class_exists($class_name) || !property_exists($class_name, $property)) {
+            return $default;
+        }
+        $properties = get_class_vars($class_name);
+        return $properties[$property];
     }
 
     /**
@@ -401,7 +420,7 @@ class Model extends ORMWrapper
      */
     protected static function _id_column_name($class_name)
     {
-        return (isset(static::$_id_column)) ? static::$_id_column : self::DEFAULT_ID_COLUMN;
+        return self::_get_static_property($class_name, '_id_column', self::DEFAULT_ID_COLUMN);
     }
 
     /**
