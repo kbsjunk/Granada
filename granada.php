@@ -394,10 +394,11 @@ class Model extends ORMWrapper
      */
     protected static function _get_table_name($class_name)
     {
-        if(!isset(self::$cache['tableName'][$class_name]))  
-            self::$cache['tableName'][$class_name] = (isset(static::$_table)) ? static::$_table : self::_class_name_to_table_name($class_name);
-        
-        return self::$cache['tableName'][$class_name];
+            $specified_table_name = self::_get_static_property($class_name, '_table');
+            if (is_null($specified_table_name)) {
+                return self::_class_name_to_table_name($class_name);
+            }
+            return $specified_table_name;
     }
 
     /**
@@ -405,13 +406,12 @@ class Model extends ORMWrapper
      * to a table name in lowercase_with_underscores.
      * For example, CarTyre would be converted to car_tyre.
      */
-    protected static function _class_name_to_table_name($class_name)
-    {
-        //caching process
-        if(!isset(self::$cache['className'][$class_name]))
-            self::$cache['className'][$class_name] = strtolower(preg_replace('/(?<=[a-z])([A-Z])/', '_$1', $class_name));
-        
-        return self::$cache['className'][$class_name];
+    protected static function _class_name_to_table_name($class_name) {
+        return strtolower(preg_replace(
+            array('/\\\\/', '/(?<=[a-z])([A-Z])/', '/__/'),
+            array('_', '_$1', '_'),
+            ltrim($class_name, '\\')
+        ));
     }
 
     /**
@@ -431,7 +431,7 @@ class Model extends ORMWrapper
      */
     protected static function _build_foreign_key_name($specified_foreign_key_name, $table_name)
     {
-        if (!is_null($specified_foreign_key_name)) {
+        if (!is_null($specified_foreign_key_name)) {     
             return $specified_foreign_key_name;
         }
         return $table_name . self::DEFAULT_FOREIGN_KEY_SUFFIX;
@@ -487,6 +487,7 @@ class Model extends ORMWrapper
         $foreign_key_name = self::_build_foreign_key_name($foreign_key_name, $associated_table_name);
         $associated_object_id = $this->$foreign_key_name;
         $this->relating_key = $foreign_key_name;
+        // print_r(self::factory($associated_class_name)->where_id_is($associated_object_id));
         return self::factory($associated_class_name)->where_id_is($associated_object_id);
     }
 
