@@ -1,0 +1,11 @@
+{
+    "name": "kitbs/Granada",
+    "type": "library",
+    "description": "Fork of Granada for personal use",
+    "require": {
+        "php": ">=5.2.0"
+    },
+    "autoload": {
+        "classmap": ["granada.php","eager.php"]
+    }
+}
